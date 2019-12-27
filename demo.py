@@ -104,9 +104,9 @@ class Detector(object):
         # Deep SORT
         self.deepsort = DeepSort(args.deepsort_checkpoint,
                                  args.max_cosine_distance, args.use_cuda)
-        # if args.display:
-        #     cv2.namedWindow("test", cv2.WINDOW_NORMAL)
-        #     cv2.resizeWindow("test", args.display_width, args.display_height)
+        self.debug = args.debug
+        if self.debug and not os.path.exists(args.debug_dir):
+            os.mkdir(args.debug_dir)
         self.args = args
 
     def run(self, sequence_dir, output_file):
@@ -121,16 +121,29 @@ class Detector(object):
         for frame in range(seq_info["min_frame_idx"], seq_info["max_frame_idx"] + 1):
             frame_image = seq_info["image_filenames"][frame]
             frame_cnt += 1
+            image = cv2.imread(frame_image)
             detection_result = self.detector.run(frame_image)["results"][1]
             xywh, conf = Detector._bbox_to_xywh_cls_conf(detection_result, self.args.min_confidence)
-            output = self.deepsort.update(xywh, conf, cv2.imread(frame_image))
-            for t, l, w, h, track_id in output:
+            output = self.deepsort.update(xywh, conf, image)
+            for x1, y1, x2, y2, track_id in output:
                 results.append((
-                    frame, track_id, t, l, w, h
+                    frame, track_id, x1, y1, x2 - x1, y2 - y1  # tlwh
                 ))
             elapsed_time = time.time() - start_time
             print("Frame {:05d}, Time {:.3f}s, FPS {:.3f}".format(
                 frame_cnt, elapsed_time, frame_cnt / elapsed_time))
+            if self.debug:
+                detect_xyxy = detection_result[detection_result[:, 4] > self.args.min_confidence, :4]
+                detect_image = draw_bboxes(image, detect_xyxy)
+                cv2.imwrite(os.path.join(self.args.debug_dir,
+                                         "{}-{:05}-detect.jpg".format(seq_info["sequence_name"], frame)), detect_image)
+                if len(output) == 0:
+                    continue
+                image = cv2.imread(frame_image)
+                track_image = draw_bboxes(image, output[:, :4], output[:, -1])
+                cv2.imwrite(os.path.join(self.args.debug_dir,
+                                         "{}-{:05}-track.jpg".format(seq_info["sequence_name"], frame)), track_image)
+
         print("Done. Now write output to {}".format(args.output_file))
         with open(output_file, mode="w") as f:
             for row in results:
@@ -139,11 +152,11 @@ class Detector(object):
 
     @staticmethod
     def _bbox_to_xywh_cls_conf(bbox, min_confidence):
-        if all(bbox[:, 4] <= min_confidence):
-            return None, None
         bbox = bbox[bbox[:, 4] > min_confidence, :]
         bbox[:, 2] = bbox[:, 2] - bbox[:, 0]
         bbox[:, 3] = bbox[:, 3] - bbox[:, 1]
+        bbox[:, 0] = bbox[:, 0] + bbox[:, 2] / 2
+        bbox[:, 1] = bbox[:, 1] + bbox[:, 3] / 2
         return bbox[:, :4], bbox[:, 4]
 
 
@@ -173,7 +186,8 @@ def parse_args():
     parser.add_argument(
         "--max_cosine_distance", help="Gating threshold for cosine distance "
         "metric (object appearance).", type=float, default=0.2)
-    parser.add_argument("--no_display", dest="display", action="store_false")
+    parser.add_argument("--debug", dest="debug", action="store_true")
+    parser.add_argument("--debug_dir", help="Debugging info output directory", default="./debug")
     parser.add_argument("--no_cuda", dest="use_cuda", action="store_false")
     return parser.parse_args()
 
