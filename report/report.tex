@@ -8,6 +8,10 @@
 %\usepackage{cases}
 %\usepackage{subeqnarray}
 
+\usepackage{color}
+\usepackage{xcolor}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
 \begin{document}
 %
 % paper title
@@ -70,7 +74,7 @@
 
 \section{Introduction}
 
-This is the report of the course project of EI339 Artificial Intelligence. We should admit that it is not one of publishable quality, although we paid a lot, e.g., writing the report in publishable format.
+This is the report of the course project of EI339 Artificial Intelligence. We should admit that it is not one of publishable quality, although we paid a lot, e.g., writing the report in publishable format. As for the three evaluation levels, we think our work can be classified into Good, for \todo{brief supporting points}.
 
 Multiple Object Tracking (MOT) plays an important role in solving many fundamental problems in video analysis and computer vision. Its main task is to find and identify moving objects in a sequence of images. Depending on how objects are initialized, the strategies of MOT can be classified into two sets: Detection-Based Tracking (DBT) and Detection-Free Tracking (DFT), of which the first one is the leading paradigm in this field of research. The DBT methods employ two steps: Objection Detection and Data Association, i.e., detecting objects of interest in each frame of a video first and then obtrain the tracks of the detected objects across frames according to their correspondence. In this way, the MOT problem can be viewed as a data association problem.
 
