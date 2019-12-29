@@ -4,9 +4,9 @@ SJTU EI339 Artificial Intelligence course project: Multi-Object Tracking based o
 
 ## Demo
 
-For example, the tracking result of [`MOT16-02`](https://motchallenge.net/vis/MOT16-02) is
+For example, the tracking result of [`MOT16-02`](https://motchallenge.net/vis/MOT16-02) is: (click to watch it on Youtube)
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/0Ba0rT8mfAQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![Click to play](http://img.youtube.com/vi/0Ba0rT8mfAQ/0.jpg)](http://www.youtube.com/watch?v=0Ba0rT8mfAQ "")
 
 ## Prerequisites
 
