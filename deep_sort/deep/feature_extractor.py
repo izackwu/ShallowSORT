@@ -4,11 +4,12 @@ import numpy as np
 import cv2
 
 from .model import Net
+from .original_model import Net as OriginalNet
 
 
 class Extractor(object):
-    def __init__(self, model_path, use_cuda=True):
-        self.net = Net(reid=True)
+    def __init__(self, model_path, use_cuda=True, use_original_model=False):
+        self.net = OriginalNet(reid=True) if use_original_model else Net(reid=True)
         self.device = "cuda" if torch.cuda.is_available() and use_cuda else "cpu"
         state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)['net_dict']
         self.net.load_state_dict(state_dict)

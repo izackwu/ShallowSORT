@@ -103,7 +103,7 @@ class Detector(object):
         self.detector = detector_factory[centernet_opt.task](centernet_opt)
         # Deep SORT
         self.deepsort = DeepSort(args.deepsort_checkpoint,
-                                 args.max_cosine_distance, args.use_cuda)
+                                 args.max_cosine_distance, args.use_cuda, args.use_original_model)
         self.debug = args.debug
         if self.debug and not os.path.exists(args.debug_dir):
             os.mkdir(args.debug_dir)
@@ -163,6 +163,7 @@ class Detector(object):
 def parse_args():
     parser = argparse.ArgumentParser("CenterNet + DeepSORT, for MOTChallenge")
     parser.add_argument("sequence_dir", help="Path to MOTChallenge sequence directory")
+    parser.add_argument("--use_original_model", dest="use_original_model", action="store_true")
     parser.add_argument("--model_path", help="Path to the model for CenterNet",
                         default="CenterNet/models/ctdet_coco_dla_2x.pth")
     parser.add_argument("--arch", help="CenterNet arch", default="dla_34")
@@ -176,13 +177,6 @@ def parse_args():
         "--min_confidence", help="Detection confidence threshold. Disregard "
         "all detections that have a confidence lower than this value.",
         default=0.3, type=float)
-    parser.add_argument(
-        "--min_detection_height", help="Threshold on the detection bounding "
-        "box height. Detections with height smaller than this value are "
-        "disregarded", default=0, type=int)
-    parser.add_argument(
-        "--nms_max_overlap",  help="Non-maxima suppression threshold: Maximum "
-        "detection overlap.", default=1.0, type=float)
     parser.add_argument(
         "--max_cosine_distance", help="Gating threshold for cosine distance "
         "metric (object appearance).", type=float, default=0.2)
