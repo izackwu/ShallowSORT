@@ -7,10 +7,15 @@
 \usepackage{graphicx}
 %\usepackage{cases}
 %\usepackage{subeqnarray}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\usepackage{stfloats}
 
 \usepackage{color}
 \usepackage{xcolor}
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\tabincell}[2]{\begin{tabular}{@{}#1@{}}#2\end{tabular}}
 
 \begin{document}
 %
@@ -20,7 +25,7 @@
 % not capitalized unless they are the first or last word of the title.
 % Linebreaks \\ can be used within to get better formatting as desired.
 % Do not put math or special symbols in the title.
-\title{Multiple Object Tracking with DeepSORT}
+\title{Real-time Multiple Object Tracking with Deep SORT and CenterNet}
 %
 %
 % author names and IEEE memberships
@@ -56,10 +61,7 @@
 % As a general rule, do not put math, special symbols or citations
 % in the abstract or keywords.
 \begin{abstract}
-    This is the report of the course project of EI339 Artificial Intelligence, concerning the problem of multiple object tracking. Simple Online and Realtime Tracking (SORT) is a pragmatic
-    approach to multiple object tracking with a focus on simple,
-    effective algorithms. Deep SORT integrates appearance information to improve the performance of SORT. \\
-    In this paper, we studied and re-implemented the Deep SORT method, and proposed some improvements to it.
+    This is the report of the course project of EI339 Artificial Intelligence, concerning the problem of multiple object tracking. Simple Online and Real-time Tracking (SORT) is a pragmatic approach to multiple object tracking with a focus on simple, effective algorithms. Deep SORT integrates appearance information to improve the performance of SORT. As Detection-Based Tracking methods, they depend on good object detectors. CenterNet is a fast and powerful recently proposed approach, reaching state-of-the-art in real-time objection detection. In this paper, we studied and re-implemented the Deep SORT method, with the integration of CenterNet, and proposed some improvements to it. Also, our code has been made open source on Github. \footnote{https://github.com/keithnull/ShallowSORT}
 \end{abstract}
 
 % Note that keywords are not normally used for peerreview papers.
@@ -74,50 +76,101 @@
 
 \section{Introduction}
 
-This is the report of the course project of EI339 Artificial Intelligence. We should admit that it is not one of publishable quality, although we paid a lot, e.g., writing the report in publishable format. As for the three evaluation levels, we think our work can be classified into Good, for \todo{brief supporting points}.
+This is the report of the course project of EI339 Artificial Intelligence. As for the three evaluation levels, we think our work can be classified into \textbf{Excellent}. The reasons are:
+\begin{itemize}
+    \item We have carefully studied and analyzed SORT \cite{Wojke2017simple} and deep SORT \cite{Wojke2018deep}, reading both the papers and code.
+    \item We have done a comprehensive investigation into currently popular object detection approaches including Faster R-CNN \cite{ren2015faster}, SSD \cite{liu2016ssd}, YOLOv3 \cite{redmon2018yolov3}, CornerNet \cite{law2018cornernet} and CenterNet \cite{zhou2019objects}.
+    \item We have integrated deep SORT and CenterNet, which is currently the state-of-the-art approach in \textbf{real-time} object detection, achieving some engineering success with proper and good use of existing open source code.
+    \item We have obtained some notable real-time performance improvements.
+\end{itemize}
 
-Multiple Object Tracking (MOT) plays an important role in solving many fundamental problems in video analysis and computer vision. Its main task is to find and identify moving objects in a sequence of images. Depending on how objects are initialized, the strategies of MOT can be classified into two sets: Detection-Based Tracking (DBT) and Detection-Free Tracking (DFT), of which the first one is the leading paradigm in this field of research. The DBT methods employ two steps: Objection Detection and Data Association, i.e., detecting objects of interest in each frame of a video first and then obtrain the tracks of the detected objects across frames according to their correspondence. In this way, the MOT problem can be viewed as a data association problem.
+Multiple Object Tracking (MOT) plays an important role in solving many fundamental problems in video analysis and computer vision. Its main task is to find and identify moving objects in a sequence of images. Depending on how objects are initialized, the strategies of MOT can be classified into two sets: Detection-Based Tracking (DBT) and Detection-Free Tracking (DFT), of which the first one is the leading paradigm in this field of research. The DBT methods employ two steps: Objection Detection and Data Association, i.e., detecting objects of interest in each frame of a video first and then obtain the tracks of the detected objects across frames according to their correspondence. In this way, the MOT problem can be viewed as a data association problem.
 
-MOT can also be categorized into online tracking and offline tracking. The difference is whether or not observations from future frames are utilized when handling the current frame. Online algorithms generally performs worse than offline algorithms, which is natural, but is required in real time scenarios. Our focus is on online tracking during this project.
+MOT can also be categorized into online tracking and offline tracking. The difference is whether or not observations from future frames are utilized when handling the current frame. Online algorithms generally performs worse than offline algorithms, which is intuitive and natural. However, it is essential in many real-time scenarios. Therefore, in this project, our focus lies in online tracking.
 
-Deep SORT \cite{Wojke2017simple} is an extension to Simple Real time Tracker (SORT) \cite{Bewley2016_sort}, and is one of the most popular and the most widely used object tracking frameworks. It achieved competitive performance with simple and elegent ideas, and can act as a baseline in the field of MOT. In this project, we are asked to study and re-implement the classical Deep SORT algorithm and achieve some improvements based on the Deep SORT framework.
+Deep SORT \cite{Wojke2017simple} is an extension to Simple Real time Tracker (SORT) \cite{Bewley2016_sort}, and is one of the most popular and the most widely used object tracking frameworks. It achieved competitive performance with simple and elegant ideas, and can act as a baseline in the field of MOT. In this project, we study and re-implement the classical Deep SORT algorithm and achieve some improvements based on the Deep SORT framework.
 
-\section{Studying Deep Sort}
+\section{Background}
 
-\subsection{The ideas of Deep SORT}
+\subsection{Deep SORT}
 
-Simple online and realtime tracking (SORT) is a very simple framework that performs Kalman filtering in image space and frame-by-frame data association using the Hungarian method with an association metric that measures bounding box overlap. This simple approach achieved favorable performance at high frame rates. It used state of the art convolutional neural network (CNN) based object detector \cite{ren2015faster}.
+Simple online and real-time tracking (SORT) is a very simple framework that performs Kalman filtering in image space and frame-by-frame data association using the Hungarian method with an association metric that measures bounding box overlap. This simple approach achieved favorable performance at high frame rates. It used state of the art convolutional neural network (CNN) based object detector Faster R-CNN \cite{ren2015faster}.
 
 To be more specific, Hungarian algorithm \cite{kuhn1955hungarian} is a very classic algorithm to find a maximum cardinality matching of minimum cost in the bipartite graph matching problem. And Kalman filter \cite{kalman1960new} is an algorithm that uses a series of measurements observed over time to predict the motion of an object. SORT approximates the inter-frame displacements of each object with a linear constant velocity model which is independent of other objects and camera motion. The state of each target is modelled as:
 
 \[
-    \boldsymbol{x} = [u,v,s,r,\dot{u},\dot{v},\dot{s}]^T, 
+    \boldsymbol{x} = [u,v,s,r,\dot{u},\dot{v},\dot{s}]^T,
 \]
 
 \noindent where $u$ and $v$ represent the horizontal and vertical pixel location of the centre of the target, while the scale $s$ and $r$ represent the scale (area) and the aspect ratio of the target’s bounding box respectively.
 
 Now the idea behind SORT seems rather simple, but it did make some contributions to the development of MOT at that time. Its code was also made open source, and provided a new baseline for the field of MOT.
 
-Deep SORT took another step forward. The main contribution of Deep SORT beyond the original framework of SORT is a deep association metric learned on a largescale person re-identification dataset. Besides, it integrates appearance information to recover identities after long-term occlusions, when motion is less discriminative. It extensions reduce the number of identity switches by 45\%, which improves the defects of SORT, achieving overall competitive performance at high frame rates.
+Deep SORT took another step forward. The main contribution of Deep SORT beyond the original framework of SORT is a deep association metric learned on a large scale person re-identification data-set. Besides, it integrates appearance information to recover identities after long-term occlusions, when motion is less discriminate. It extensions reduce the number of identity switches by 45\%, which improves the defects of SORT, achieving overall competitive performance at high frame rates.
 
-We have to stress that Detaction-Based Tracking algorithms like SORT and Deep SORT rely highly on the results of object detection, and appealing to more powerful detector or one trained in a more targeted way can easily provide better tracking results, as the authors of SORT admitted.
+We have to stress that Detection-Based Tracking algorithms like SORT and Deep SORT rely highly on the results of object detection, and appealing to more powerful detector or one trained in a more targeted way can easily provide better tracking results, as the authors of SORT admitted.
 
-\subsection{Implementation}
+\subsection{CenterNet}
+As have been stated at the end of previous section, object detection plays a vital role in deep SORT. On one hand, the quality and accuracy of object detection affects the final quality of object tracking; on the other hand, the real-time performance of object tracking largely relies on the speed of object detection. Therefore, to achieve real-time improvements with deep SORT, we focus on the real-time performance of object detection.
 
-% \begin{figure}[t]
-%     \centering
-%     \includegraphics[width=\linewidth]{fig/1.pdf}
-%     \caption{A picture.}
-%     \label{fig:example}
-% \end{figure}
+After some investigation, we compare the performance of a few currently popular real-time object detectors. According to PapersWithCode's data \footnote{https://paperswithcode.com/sota/real-time-object-detection-on-coco}, on COCO 2017 data-set, top ranked real-time object detectors are listed in Table \ref{detectors}. Eventually, we decide to adopt CenterNet \cite{zhou2019objects} in our implementation.
 
-% see Fig.~\ref{fig:example}. 
+Within the scope of our knowledge, CenterNet is currently the state-of-the-art real-time object detector. It treats each object as a single point and then uses keypoint estimation to get all its other properties like bounding box. In such way, it achieves a good trade-off between accuracy and speed. For example, on COCO 2017 data-set, its maximal speed is 142 FPS with 29.1\% AP, or 52 FPS with 37.4\% AP.
 
-\section{Our Improvements}
+\begin{table*}[t]
+\centering
+\caption{Top ranked real-time object detector on COCO 2017}
+\label{detectors}
+\begin{tabular}{llllp{9cm}l}
+\hline
+Rank & Method                     & FPS  & MAP  & Paper                                                                                   & Year \\
+\hline
+1    & CenterNet ResNet-18        & 142  & 28.1 & Objects as Points                                                                       & 2019 \\
+2    & TTFNet                     & 54.4 & 35.1 & Training-Time-Friendly Network for Real-Time Object Detection                           & 2019 \\
+3    & CenterNet DLA-34           & 52   & 37.4 & Objects as Points                                                                       & 2019 \\
+4    & CenterMaskLite-MobileNetV2 & 50   & 28.8 & CenterMask : Real-Time Anchor-Free Instance Segmentation                                & 2019 \\
+5    & YOLOv3-320                 & 45   & 28.2 & YOLOv3: An Incremental Improvement                                                      & 2018 \\
+6    & SSD512-HarDNet85           & 39   & 35.1 & HarDNet: A Low Memory Traffic Network                                                   & 2019 \\
+7    & YOLOv3-418                 & 34   & 31.0 & YOLOv3: An Incremental Improvement                                                      & 2018 \\
+8    & CornerNet-Squeeze          & 33   & 34.4 & CornerNet-Lite: Efficient Keypoint Based Object Detection                               & 2019 \\
+9    & RefineDet320 + VoVNet-57   & 21.2 & 33.9 & An Energy and GPU-Computation Efficient Backbone Network for Real-Time Object Detection & 2019 \\
+10   & YOLOv3-608                 & 20   & 33   & YOLOv3: An Incremental Improvement                                                      & 2018\\
+\hline
+\end{tabular}
+\end{table*}
+
+\begin{table*}[b]
+\centering
+\caption{Evaluation results of different detectors with different backbones}
+\label{eva}
+\begin{tabular}{llllllllllllllll}
+\hline
+                    & MOTA    & MOTP  & IDF1    & IDP     & IDR     & Rcll    & Prcn     & MT  & PT  & ML  & FP    & FN    & IDs & FM   \\ \hline
+Benchmark           & 51.60\% & 0.189 & 60.20\% & 64.40\% & 56.60\% & 70.10\% & 79.90\% & 214 & 235 & 68  & 19490 & 32985 & 935 & 1439 \\
+YOLOv3              & 33.10\% & 0.235 & 41.80\% & 65.90\% & 30.60\% & 40.00\% & 86.00\% & 92  & 208 & 217 & 7212  & 66270 & 427 & 1269 \\
+CenterNet Resnet-18 & 23.90\% & 0.247 & 34.50\% & 49.90\% & 26.30\% & 38.60\% & 73.10\% & 89  & 223 & 205 & 15663 & 67817 & 584 & 1707 \\
+CenterNet DLA-34    & 29.50\% & 0.217 & 44.30\% & 56.20\% & 36.50\% & 47.60\% & 73.20\% & 105 & 251 & 161 & 19180 & 57905 & 753 & 1676 \\
+\hline
+\end{tabular}
+\end{table*}
+
+
+% \section{Our Improvements}
+
+\section{Experiments}
+We evaluate the performance of our tracking implementation on a diverse set of testing sequences as set by the MOT16 data-set \cite{milan2016mot16} which contains both moving and static camera sequences. To show the advantage of CenterNet, we have also tried YOLOv3 detector to provide a comparison.
+
+\subsection{Metrics}
+Since it is difficult to use one single score to evaluate multi-target tracking performance, we utilise the standard MOT metrics \cite{bernardin2008evaluating}.
+
+\subsection{Performance Evaluation}
+Tracking performance is evaluated using the MOT16 benchmark \cite{milan2016mot16} where the ground truth for 7 training sequences is withheld. We just follow the evaluation method described in py-motmetrics. Table \ref{eva} is the results we get by using different detectors with different backbones. From the table we have found there is a certain gap between the benchmark and our project with the main indices of accuracy, MOTA and MOTP. As for the YOLOv3,  since the model we get has been trained with the original MOT data, the accuracy is a little better than our model, which has not been trained specifically for this data-set. For the two different backbones, the accuracy of DLA-34 is better than the accuracy of Resnet-18, which is expected. From this we can find that choosing a better detector is a way to improve tracking results. However, since the training and the parameter adjustments cost much time, we didn't dig more in this aspect.
+\subsection{Runtime}
+For a $1920 \times 1080$ video, the program runs in 3.6 FPS with CenterNet DLA-34, 9.1 FPS with CenterNet Resnet-18 and 3.0 FPS with YOLOv3, on average. The reason why the FPS is not so high, we think, is that our equipment is not so good, with only 4GB graphics memory. But by the comparison with YOLOv3 detector, we have found that the CenterNet does perform better in speed, which can possibly reach the goal of real-time with a more powerful machine.
 
 \section{Conclusion}
 
-In this project, we dove into the field of Multiple Object Tracking (MOT). It is both interesting and challenging. Our work is based on the credible Deep SORT method. We presented ...
+In this project, we dove into the field of Multiple Object Tracking (MOT). It is both interesting and challenging. Our work is based on the credible Deep SORT method and currently state-of-the-art objection detection approach CenterNet. We made a step towards real-time multiple object tracking from an engineering prospective.
 
 \bibliographystyle{IEEEtran}
 \bibliography{Ref}
